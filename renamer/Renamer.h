@@ -59,7 +59,7 @@ private:
     RenameType m_renameType;
     bool m_filesRenamed;
     QStringList m_extraFiles;
-
+    QString cleanSpecialCharacters(QString toClean);
     void renameMovies(QList<Movie*> movies, const QString &filePattern, const QString &filePatternMulti,
                       const QString &directoryPattern, const bool &renameFiles, const bool &renameDirectories, const bool &dryRun = false);
     void renameConcerts(QList<Concert*> concerts, const QString &filePattern, const QString &filePatternMulti,

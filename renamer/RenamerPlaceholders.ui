@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>642</width>
-    <height>486</height>
+    <height>518</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -68,7 +68,7 @@
         <item row="10" column="0">
          <widget class="QLabel" name="labelArtist">
           <property name="text">
-           <string notr="true">&lt;artist&gt;</string>
+           <string notr="true">&lt;artist&gt; / &lt;artist_esc&gt;</string>
           </property>
           <property name="textFormat">
            <enum>Qt::PlainText</enum>
@@ -138,7 +138,7 @@
         <item row="11" column="0">
          <widget class="QLabel" name="labelAlbum">
           <property name="text">
-           <string notr="true">&lt;album&gt;</string>
+           <string notr="true">&lt;album&gt; / &lt;album_esc&gt;</string>
           </property>
           <property name="textFormat">
            <enum>Qt::PlainText</enum>
@@ -176,7 +176,7 @@
         <item row="5" column="0">
          <widget class="QLabel" name="labelSortTitle">
           <property name="text">
-           <string notr="true">&lt;sortTitle&gt;</string>
+           <string notr="true">&lt;sortTitle&gt; / &lt;sortTitle_esc&gt;</string>
           </property>
           <property name="textFormat">
            <enum>Qt::PlainText</enum>
@@ -194,7 +194,7 @@
         <item row="4" column="0">
          <widget class="QLabel" name="labelOriginalTitle">
           <property name="text">
-           <string notr="true">&lt;originalTitle&gt;</string>
+           <string notr="true">&lt;originalTitle&gt; / &lt;originalTitle_esc&gt;</string>
           </property>
           <property name="textFormat">
            <enum>Qt::PlainText</enum>
@@ -227,7 +227,7 @@
         <item row="3" column="0">
          <widget class="QLabel" name="labelTitle">
           <property name="text">
-           <string notr="true">&lt;title&gt;</string>
+           <string notr="true">&lt;title&gt; / &lt;title_esc&gt;</string>
           </property>
           <property name="textFormat">
            <enum>Qt::PlainText</enum>
@@ -374,7 +374,7 @@
         <item row="9" column="0">
          <widget class="QLabel" name="labelShowTitle">
           <property name="text">
-           <string notr="true">&lt;showTitle&gt;</string>
+           <string notr="true">&lt;showTitle&gt; / &lt;showTitle_esc&gt;</string>
           </property>
           <property name="textFormat">
            <enum>Qt::PlainText</enum>

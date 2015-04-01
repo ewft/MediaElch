@@ -177,6 +177,24 @@ void Renamer::onDryRun()
     ui->results->append("<span style=\"color:#01a800;\"><b>" + tr("Finished") + "</b></span>");
 }
 
+QString Renamer::cleanSpecialCharacters(QString toClean)
+{
+    QString clean = toClean.replace(" ","_");
+    clean = clean.replace("[é|ê|ë|è]","e");
+    clean = clean.replace("[à|â|ä]","a");
+    clean = clean.replace("[î|ï]","i");
+    clean = clean.replace("æ","ae");
+    clean = clean.replace("[É|Ê|Ë|È]","E");
+    clean = clean.replace("[À|Â|Ä]","A");
+    clean = clean.replace("[Î|Ï]","I");
+    clean = clean.replace("Æ","ae");
+    clean = clean.replace("'","_");
+
+    return clean;
+}
+
+
+
 void Renamer::renameMovies(QList<Movie*> movies, const QString &filePattern, const QString &filePatternMulti,
                            const QString &directoryPattern, const bool &renameFiles, const bool &renameDirectories, const bool &dryRun)
 {
@@ -218,6 +236,9 @@ void Renamer::renameMovies(QList<Movie*> movies, const QString &filePattern, con
                 QFileInfo fi(file);
                 QString baseName = fi.completeBaseName();
                 QDir currentDir = fi.dir();
+                Renamer::replace(newFileName, "title_esc", Renamer::cleanSpecialCharacters(movie->name()));
+                Renamer::replace(newFileName, "originalTitle_esc", Renamer::cleanSpecialCharacters(movie->originalName()));
+                Renamer::replace(newFileName, "sortTitle_esc", Renamer::cleanSpecialCharacters(movie->sortTitle()));
                 Renamer::replace(newFileName, "title", movie->name());
                 Renamer::replace(newFileName, "originalTitle", movie->originalName());
                 Renamer::replace(newFileName, "sortTitle", movie->sortTitle());
@@ -404,6 +425,9 @@ void Renamer::renameMovies(QList<Movie*> movies, const QString &filePattern, con
         }
 
         if (renameDirectories && movie->inSeparateFolder()) {
+            Renamer::replace(newFolderName, "title_esc", Renamer::cleanSpecialCharacters(movie->name()));
+            Renamer::replace(newFolderName, "originalTitle_esc", Renamer::cleanSpecialCharacters(movie->originalName()));
+            Renamer::replace(newFolderName, "sortTitle_esc", Renamer::cleanSpecialCharacters(movie->sortTitle()));
             Renamer::replace(newFolderName, "title", movie->name());
             Renamer::replace(newFolderName, "originalTitle", movie->originalName());
             Renamer::replace(newFolderName, "sortTitle", movie->sortTitle());
@@ -471,6 +495,8 @@ void Renamer::renameEpisodes(QList<TvShowEpisode *> episodes, const QString &fil
                 QFileInfo fi(file);
                 QString baseName = fi.completeBaseName();
                 QDir currentDir = fi.dir();
+                Renamer::replace(newFileName, "showTitle_esc", Renamer::cleanSpecialCharacters(episode->showTitle()));
+                Renamer::replace(newFileName, "title_esc", Renamer::cleanSpecialCharacters(episode->name()));
                 Renamer::replace(newFileName, "title", episode->name());
                 Renamer::replace(newFileName, "showTitle", episode->showTitle());
                 Renamer::replace(newFileName, "year", episode->firstAired().toString("yyyy"));
@@ -620,6 +646,8 @@ void Renamer::renameShows(QList<TvShow *> shows, const QString &directoryPattern
 
         QDir dir(show->dir());
         QString newFolderName = directoryPattern;
+        Renamer::replace(newFolderName, "title_esc", Renamer::cleanSpecialCharacters(show->name()));
+        Renamer::replace(newFolderName, "showTitle_esc", Renamer::cleanSpecialCharacters(show->name()));
         Renamer::replace(newFolderName, "title", show->name());
         Renamer::replace(newFolderName, "showTitle", show->name());
         Renamer::replace(newFolderName, "year", show->firstAired().toString("yyyy"));
@@ -672,7 +700,9 @@ void Renamer::renameConcerts(QList<Concert*> concerts, const QString &filePatter
                 QFileInfo fi(file);
                 QString baseName = fi.completeBaseName();
                 QDir currentDir = fi.dir();
-
+                Renamer::replace(newFileName, "title_esc", Renamer::cleanSpecialCharacters(concert->name()));
+                Renamer::replace(newFileName, "artist_esc", Renamer::cleanSpecialCharacters(concert->artist()));
+                Renamer::replace(newFileName, "album_esc", Renamer::cleanSpecialCharacters(concert->album()));
                 Renamer::replace(newFileName, "title", concert->name());
                 Renamer::replace(newFileName, "artist", concert->artist());
                 Renamer::replace(newFileName, "album", concert->album());
