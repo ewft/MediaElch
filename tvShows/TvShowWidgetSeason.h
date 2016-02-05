@@ -21,6 +21,7 @@ public:
     explicit TvShowWidgetSeason(QWidget *parent = 0);
     ~TvShowWidgetSeason();
     void setSeason(TvShow *show, int season);
+    void updateSeasonInfo();
 
 public slots:
     void onClear();
@@ -37,6 +38,7 @@ signals:
 private slots:
     void onChooseImage();
     void onDeleteImage();
+    void onImageDropped(int imageType, QUrl imageUrl);
 
     void onRevertChanges();
     void onDownloadFinished(DownloadManagerElement elem);

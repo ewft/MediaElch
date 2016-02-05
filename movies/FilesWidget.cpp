@@ -49,7 +49,11 @@ FilesWidget::FilesWidget(QWidget *parent) :
         ui->files->setColumnHidden(i, true);
     }
     ui->files->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+#ifdef Q_OS_WIN
     ui->files->setIconSize(QSize(12, 12));
+#else
+    ui->files->setIconSize(QSize(16, 16));
+#endif
 
     foreach (const MediaStatusColumns &column, Settings::instance()->mediaStatusColumns())
         ui->files->setColumnHidden(MovieModel::mediaStatusToColumn(column), false);
@@ -86,6 +90,7 @@ FilesWidget::FilesWidget(QWidget *parent) :
     QAction *actionMarkForSync = new QAction(tr("Add to Synchronization Queue"), this);
     QAction *actionUnmarkForSync = new QAction(tr("Remove from Synchronization Queue"), this);
     QAction *actionOpenFolder = new QAction(tr("Open Movie Folder"), this);
+    QAction *actionOpenNfo = new QAction(tr("Open NFO File"), this);
     m_contextMenu = new QMenu(ui->files);
     m_contextMenu->addAction(actionMultiScrape);
     m_contextMenu->addSeparator();
@@ -98,6 +103,7 @@ FilesWidget::FilesWidget(QWidget *parent) :
     m_contextMenu->addAction(actionUnmarkForSync);
     m_contextMenu->addSeparator();
     m_contextMenu->addAction(actionOpenFolder);
+    m_contextMenu->addAction(actionOpenNfo);
     m_contextMenu->addSeparator();
     m_contextMenu->addMenu(labelsMenu);
     m_contextMenu->addMenu(mediaStatusColumnsMenu);
@@ -109,6 +115,7 @@ FilesWidget::FilesWidget(QWidget *parent) :
     connect(actionMarkForSync, SIGNAL(triggered()), this, SLOT(markForSync()));
     connect(actionUnmarkForSync, SIGNAL(triggered()), this, SLOT(unmarkForSync()));
     connect(actionOpenFolder, SIGNAL(triggered()), this, SLOT(openFolder()));
+    connect(actionOpenNfo, SIGNAL(triggered()), this, SLOT(openNfoFile()));
 
     connect(ui->files, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showContextMenu(QPoint)));
     connect(ui->files->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), this, SLOT(itemActivated(QModelIndex, QModelIndex)));
@@ -182,8 +189,11 @@ void FilesWidget::multiScrape()
 void FilesWidget::markAsWatched()
 {
     m_contextMenu->close();
-    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0)) {
-        int row = index.model()->data(index, Qt::UserRole).toInt();
+
+    QList<int> rows;
+    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0))
+        rows << index.model()->data(index, Qt::UserRole).toInt();
+    foreach (int row, rows) {
         Movie *movie = Manager::instance()->movieModel()->movie(row);
         movie->setWatched(true);
         if (movie->playcount() < 1)
@@ -198,8 +208,10 @@ void FilesWidget::markAsWatched()
 void FilesWidget::markAsUnwatched()
 {
     m_contextMenu->close();
-    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0)) {
-        int row = index.model()->data(index, Qt::UserRole).toInt();
+    QList<int> rows;
+    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0))
+        rows << index.model()->data(index, Qt::UserRole).toInt();
+    foreach (int row, rows) {
         Movie *movie = Manager::instance()->movieModel()->movie(row);
         if (movie->watched())
             movie->setWatched(false);
@@ -234,7 +246,10 @@ void FilesWidget::loadStreamDetails()
 void FilesWidget::markForSync()
 {
     m_contextMenu->close();
-    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0)) {
+    QList<QModelIndex> indexes;
+    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0))
+        indexes << index;
+    foreach (const QModelIndex &index, indexes) {
         int row = index.model()->data(index, Qt::UserRole).toInt();
         Movie *movie = Manager::instance()->movieModel()->movie(row);
         movie->setSyncNeeded(true);
@@ -245,7 +260,10 @@ void FilesWidget::markForSync()
 void FilesWidget::unmarkForSync()
 {
     m_contextMenu->close();
-    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0)) {
+    QList<QModelIndex> indexes;
+    foreach (const QModelIndex &index, ui->files->selectionModel()->selectedRows(0))
+        indexes << index;
+    foreach (const QModelIndex &index, indexes) {
         int row = index.model()->data(index, Qt::UserRole).toInt();
         Movie *movie = Manager::instance()->movieModel()->movie(row);
         movie->setSyncNeeded(false);
@@ -256,12 +274,28 @@ void FilesWidget::unmarkForSync()
 void FilesWidget::openFolder()
 {
     m_contextMenu->close();
+    if (!ui->files->currentIndex().isValid())
+        return;
     int row = ui->files->currentIndex().data(Qt::UserRole).toInt();
     Movie *movie = Manager::instance()->movieModel()->movie(row);
-    if (movie->files().isEmpty())
+    if (!movie || movie->files().isEmpty())
         return;
     QFileInfo fi(movie->files().at(0));
     QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absolutePath()));
+}
+
+void FilesWidget::openNfoFile()
+{
+    m_contextMenu->close();
+    if (!ui->files->currentIndex().isValid())
+        return;
+    int row = ui->files->currentIndex().data(Qt::UserRole).toInt();
+    Movie *movie = Manager::instance()->movieModel()->movie(row);
+    if (!movie || movie->files().isEmpty())
+        return;
+
+    QFileInfo fi(Manager::instance()->mediaCenterInterface()->nfoFilePath(movie));
+    QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absoluteFilePath()));
 }
 
 /**

@@ -24,6 +24,7 @@ public:
     explicit TvShowWidgetTvShow(QWidget *parent = 0);
     ~TvShowWidgetTvShow();
     void setTvShow(TvShow *show);
+    void updateTvShowInfo();
 
 public slots:
     void onSetEnabled(bool enabled);
@@ -54,6 +55,7 @@ private slots:
 
     void onChooseImage();
     void onDeleteImage();
+    void onImageDropped(int imageType, QUrl imageUrl);
 
     void onPosterDownloadFinished(DownloadManagerElement elem);
     void onDownloadsFinished(TvShow *show);
@@ -66,9 +68,14 @@ private slots:
     void onDownloadTune();
 
     void onNameChange(QString text);
+    void onImdbIdChange(QString text);
+    void onTvdbIdChange(QString text);
+    void onStatusChange(int index);
     void onSortTitleChange(QString text);
     void onCertificationChange(QString text);
     void onRatingChange(double value);
+    void onVotesChange(int value);
+    void onTop250Change(int value);
     void onFirstAiredChange(QDate date);
     void onStudioChange(QString studio);
     void onOverviewChange();
@@ -78,6 +85,9 @@ private slots:
     void onRemoveExtraFanart(const QString &file);
     void onRemoveExtraFanart(const QByteArray &image);
     void onAddExtraFanart();
+    void onExtraFanartDropped(QUrl imageUrl);
+
+    void onShowScraperProgress(TvShow *show, int current, int max);
 
 private:
     Ui::TvShowWidgetTvShow *ui;
@@ -85,7 +95,6 @@ private:
     QLabel *m_savingWidget;
     QMovie *m_loadingMovie;
     DownloadManager *m_posterDownloadManager;
-    void updateTvShowInfo();
     void updateImages(QList<int> images);
 };
 

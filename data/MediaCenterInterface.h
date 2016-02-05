@@ -54,6 +54,7 @@ public:
     virtual QString nfoFilePath(Movie *movie) = 0;
     virtual QString nfoFilePath(Concert *concert) = 0;
     virtual QString nfoFilePath(TvShowEpisode *episode) = 0;
+    virtual QString nfoFilePath(TvShow *show) = 0;
     virtual QString nfoFilePath(Artist *artist) = 0;
     virtual QString nfoFilePath(Album *album) = 0;
 
@@ -63,6 +64,8 @@ public:
     virtual QString imageFileName(TvShow *show, int type, int season = -2, QList<DataFile> dataFiles = QList<DataFile>(), bool constructName = false) = 0;
     virtual QString imageFileName(Artist *artist, int type, QList<DataFile> dataFiles = QList<DataFile>(), bool constructName = false) = 0;
     virtual QString imageFileName(Album *album, int type, QList<DataFile> dataFiles = QList<DataFile>(), bool constructName = false) = 0;
+
+    virtual void loadBooklets(Album *album) = 0;
 };
 
 #endif // MEDIACENTERINTERFACE_H

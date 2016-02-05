@@ -13,6 +13,7 @@
 #include "globals/ImageDialog.h"
 #include "globals/ImagePreviewDialog.h"
 #include "globals/Manager.h"
+#include "image/ImageCapture.h"
 #include "notifications/NotificationBox.h"
 #include "tvShows/TvShowSearch.h"
 
@@ -58,7 +59,8 @@ TvShowWidgetEpisode::TvShowWidgetEpisode(QWidget *parent) :
 
     ui->directors->setItemDelegate(new ComboDelegate(ui->directors, WidgetTvShows, ComboDelegateDirectors));
     ui->writers->setItemDelegate(new ComboDelegate(ui->writers, WidgetTvShows, ComboDelegateWriters));
-    ui->thumbnail->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    ui->thumbnail->setDefaultPixmap(QPixmap(":/img/placeholders/thumb.png"));
+    ui->thumbnail->setShowCapture(true);
 
     m_posterDownloadManager = new DownloadManager(this);
 
@@ -67,8 +69,6 @@ TvShowWidgetEpisode::TvShowWidgetEpisode(QWidget *parent) :
     connect(ui->buttonRemoveDirector, SIGNAL(clicked()), this, SLOT(onRemoveDirector()));
     connect(ui->buttonAddWriter, SIGNAL(clicked()), this, SLOT(onAddWriter()));
     connect(ui->buttonRemoveWriter, SIGNAL(clicked()), this, SLOT(onRemoveWriter()));
-    connect(ui->thumbnail, SIGNAL(clicked()), this, SLOT(onChooseThumbnail()));
-    connect(ui->thumbnail, SIGNAL(sigClose()), this, SLOT(onDeleteThumbnail()));
     connect(m_posterDownloadManager, SIGNAL(downloadFinished(DownloadManagerElement)), this, SLOT(onPosterDownloadFinished(DownloadManagerElement)));
     connect(ui->buttonRevert, SIGNAL(clicked()), this, SLOT(onRevertChanges()));
     connect(ui->buttonReloadStreamDetails, SIGNAL(clicked()), this, SLOT(onReloadStreamDetails()));
@@ -76,6 +76,10 @@ TvShowWidgetEpisode::TvShowWidgetEpisode(QWidget *parent) :
     connect(ui->buttonRemoveActor, SIGNAL(clicked()), this, SLOT(onRemoveActor()));
     connect(ui->actors, SIGNAL(itemSelectionChanged()), this, SLOT(onActorChanged()));
     connect(ui->actor, SIGNAL(clicked()), this, SLOT(onChangeActorImage()));
+    connect(ui->thumbnail, &ClosableImage::clicked, this, &TvShowWidgetEpisode::onChooseThumbnail);
+    connect(ui->thumbnail, &ClosableImage::sigClose, this, &TvShowWidgetEpisode::onDeleteThumbnail);
+    connect(ui->thumbnail, &ClosableImage::sigImageDropped, this, &TvShowWidgetEpisode::onImageDropped);
+    connect(ui->thumbnail, &ClosableImage::sigCapture, this, &TvShowWidgetEpisode::onCaptureImage);
 
     onClear();
 
@@ -87,6 +91,8 @@ TvShowWidgetEpisode::TvShowWidgetEpisode(QWidget *parent) :
     connect(ui->displaySeason, SIGNAL(valueChanged(int)), this, SLOT(onDisplaySeasonChange(int)));
     connect(ui->displayEpisode, SIGNAL(valueChanged(int)), this, SLOT(onDisplayEpisodeChange(int)));
     connect(ui->rating, SIGNAL(valueChanged(double)), this, SLOT(onRatingChange(double)));
+    connect(ui->votes, SIGNAL(valueChanged(int)), this, SLOT(onVotesChange(int)));
+    connect(ui->top250, SIGNAL(valueChanged(int)), this, SLOT(onTop250Change(int)));
     connect(ui->certification, SIGNAL(editTextChanged(QString)), this, SLOT(onCertificationChange(QString)));
     connect(ui->firstAired, SIGNAL(dateChanged(QDate)), this, SLOT(onFirstAiredChange(QDate)));
     connect(ui->epBookmark, SIGNAL(timeChanged(QTime)), this, SLOT(onEpBookmarkChange(QTime)));
@@ -191,6 +197,14 @@ void TvShowWidgetEpisode::onClear()
     blocked = ui->rating->blockSignals(true);
     ui->rating->clear();
     ui->rating->blockSignals(blocked);
+
+    blocked = ui->votes->blockSignals(true);
+    ui->votes->clear();
+    ui->votes->blockSignals(blocked);
+
+    blocked = ui->top250->blockSignals(true);
+    ui->top250->clear();
+    ui->top250->blockSignals(blocked);
 
     blocked = ui->firstAired->blockSignals(true);
     ui->firstAired->setDate(QDate::currentDate());
@@ -301,6 +315,8 @@ void TvShowWidgetEpisode::updateEpisodeInfo()
     ui->displaySeason->blockSignals(true);
     ui->displayEpisode->blockSignals(true);
     ui->rating->blockSignals(true);
+    ui->votes->blockSignals(true);
+    ui->top250->blockSignals(true);
     ui->certification->blockSignals(true);
     ui->firstAired->blockSignals(true);
     ui->playCount->blockSignals(true);
@@ -319,6 +335,8 @@ void TvShowWidgetEpisode::updateEpisodeInfo()
     ui->displaySeason->setValue(m_episode->displaySeason());
     ui->displayEpisode->setValue(m_episode->displayEpisode());
     ui->rating->setValue(m_episode->rating());
+    ui->votes->setValue(m_episode->votes());
+    ui->top250->setValue(m_episode->top250());
     ui->firstAired->setDate(m_episode->firstAired());
     ui->playCount->setValue(m_episode->playCount());
     ui->lastPlayed->setDateTime(m_episode->lastPlayed());
@@ -384,6 +402,8 @@ void TvShowWidgetEpisode::updateEpisodeInfo()
     ui->displaySeason->blockSignals(false);
     ui->displayEpisode->blockSignals(false);
     ui->rating->blockSignals(false);
+    ui->votes->blockSignals(false);
+    ui->top250->blockSignals(false);
     ui->certification->blockSignals(false);
     ui->firstAired->blockSignals(false);
     ui->playCount->blockSignals(false);
@@ -565,8 +585,8 @@ void TvShowWidgetEpisode::onStartScraperSearch()
     TvShowSearch::instance()->exec(m_episode->showTitle(), m_episode->tvShow()->tvdbId());
     if (TvShowSearch::instance()->result() == QDialog::Accepted) {
         onSetEnabled(false);
-        m_episode->loadData(TvShowSearch::instance()->scraperId(), Manager::instance()->tvScrapers().at(0), TvShowSearch::instance()->infosToLoad());
         connect(m_episode, SIGNAL(sigLoaded()), this, SLOT(onLoadDone()), Qt::UniqueConnection);
+        m_episode->loadData(TvShowSearch::instance()->scraperId(), Manager::instance()->tvScrapers().at(0), TvShowSearch::instance()->infosToLoad());
     } else {
         emit sigSetActionSearchEnabled(true, WidgetTvShows);
         emit sigSetActionSaveEnabled(true, WidgetTvShows);
@@ -639,6 +659,23 @@ void TvShowWidgetEpisode::onChooseThumbnail()
         ui->thumbnail->setLoading(true);
         ui->buttonRevert->setVisible(true);
     }
+}
+
+void TvShowWidgetEpisode::onImageDropped(int imageType, QUrl imageUrl)
+{
+    Q_UNUSED(imageType);
+
+    if (!m_episode)
+        return;
+    emit sigSetActionSaveEnabled(false, WidgetTvShows);
+    DownloadManagerElement d;
+    d.imageType = ImageType::TvShowEpisodeThumb;
+    d.url = imageUrl;
+    d.episode = m_episode;
+    d.directDownload = true;
+    m_posterDownloadManager->addDownload(d);
+    ui->thumbnail->setLoading(true);
+    ui->buttonRevert->setVisible(true);
 }
 
 /**
@@ -1014,3 +1051,36 @@ void TvShowWidgetEpisode::onChangeActorImage()
     }
 }
 
+void TvShowWidgetEpisode::onVotesChange(int value)
+{
+    if (!m_episode)
+        return;
+    m_episode->setVotes(value);
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetEpisode::onTop250Change(int value)
+{
+    if (!m_episode)
+        return;
+    m_episode->setTop250(value);
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetEpisode::onCaptureImage()
+{
+    if (!m_episode || m_episode->files().isEmpty())
+        return;
+    QImage img;
+    if (!ImageCapture::captureImage(m_episode->files().first(), m_episode->streamDetails(), img))
+        return;
+
+    QByteArray ba;
+    QBuffer buffer(&ba);
+    buffer.open(QIODevice::WriteOnly);
+    img.save(&buffer, "JPG", 85);
+
+    ui->thumbnail->setImage(ba);
+    ImageCache::instance()->invalidateImages(Manager::instance()->mediaCenterInterface()->imageFileName(m_episode, ImageType::TvShowEpisodeThumb));
+    m_episode->setThumbnailImage(ba);
+}

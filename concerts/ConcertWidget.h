@@ -36,6 +36,7 @@ public slots:
     void setEnabledTrue(Concert *concert = 0);
     void setDisabledTrue();
     void setBigWindow(bool bigWindow);
+    void updateConcertInfo();
 
 protected:
     void resizeEvent(QResizeEvent *event);
@@ -54,6 +55,7 @@ private slots:
 
     void onChooseImage();
     void onDeleteImage();
+    void onImageDropped(int imageType, QUrl imageUrl);
 
     void concertNameChanged(QString text);
     void addGenre(QString genre);
@@ -85,6 +87,7 @@ private slots:
     void onRemoveExtraFanart(const QString &file);
     void onRemoveExtraFanart(const QByteArray &image);
     void onAddExtraFanart();
+    void onExtraFanartDropped(QUrl imageUrl);
 
     void updateImage(const int &imageType, ClosableImage *image);
 
@@ -96,7 +99,6 @@ private:
     QList<QWidget*> m_streamDetailsWidgets;
     QList< QList<QLineEdit*> > m_streamDetailsAudio;
     QList< QList<QLineEdit*> > m_streamDetailsSubtitles;
-    void updateConcertInfo();
     void updateImages(QList<int> images);
 };
 

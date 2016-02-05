@@ -54,13 +54,13 @@ TvShowWidgetTvShow::TvShowWidgetTvShow(QWidget *parent) :
     ui->labelBanner->setFont(font);
     ui->labelThumb->setFont(font);
 
-    ui->poster->setDefaultPixmap(QPixmap(":/img/film_reel.png"));
-    ui->backdrop->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->banner->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(48, 48, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->logo->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->clearArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->characterArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->thumb->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    ui->poster->setDefaultPixmap(QPixmap(":/img/placeholders/poster.png"));
+    ui->backdrop->setDefaultPixmap(QPixmap(":/img/placeholders/fanart.png"));
+    ui->logo->setDefaultPixmap(QPixmap(":/img/placeholders/logo.png"));
+    ui->clearArt->setDefaultPixmap(QPixmap(":/img/placeholders/clear_art.png"));
+    ui->banner->setDefaultPixmap(QPixmap(":/img/placeholders/banner.png"));
+    ui->characterArt->setDefaultPixmap(QPixmap(":/img/placeholders/character_art.png"));
+    ui->thumb->setDefaultPixmap(QPixmap(":/img/placeholders/thumb.png"));
 
     font = ui->actorResolution->font();
     #ifdef Q_OS_WIN32
@@ -73,6 +73,8 @@ TvShowWidgetTvShow::TvShowWidgetTvShow(QWidget *parent) :
     ui->badgeTuneExisting->setBadgeType(Badge::LabelSuccess);
     ui->badgeTuneMissing->setBadgeType(Badge::LabelWarning);
 
+    ui->btnDownloadTune->setIcon(Manager::instance()->iconFont()->icon("download", QColor(150, 150, 150), "", -1, 1.0));
+
     ui->genreCloud->setText(tr("Genres"));
     ui->genreCloud->setPlaceholder(tr("Add Genre"));
     connect(ui->genreCloud, SIGNAL(activated(QString)), this, SLOT(onAddGenre(QString)));
@@ -82,6 +84,10 @@ TvShowWidgetTvShow::TvShowWidgetTvShow(QWidget *parent) :
     ui->tagCloud->setPlaceholder(tr("Add Tag"));
     connect(ui->tagCloud, SIGNAL(activated(QString)), this, SLOT(onAddTag(QString)));
     connect(ui->tagCloud, SIGNAL(deactivated(QString)), this, SLOT(onRemoveTag(QString)));
+
+    ui->comboStatus->setItemData(0, "");
+    ui->comboStatus->setItemData(1, "Continuing");
+    ui->comboStatus->setItemData(2, "Ended");
 
     m_loadingMovie = new QMovie(":/img/spinner.gif");
     m_loadingMovie->start();
@@ -99,8 +105,9 @@ TvShowWidgetTvShow::TvShowWidgetTvShow(QWidget *parent) :
     ui->thumb->setImageType(ImageType::TvShowThumb);
     ui->clearArt->setImageType(ImageType::TvShowClearArt);
     foreach (ClosableImage *image, ui->artStackedWidget->findChildren<ClosableImage*>()) {
-        connect(image, SIGNAL(clicked()), this, SLOT(onChooseImage()));
-        connect(image, SIGNAL(sigClose()), this, SLOT(onDeleteImage()));
+        connect(image, &ClosableImage::clicked, this, &TvShowWidgetTvShow::onChooseImage);
+        connect(image, &ClosableImage::sigClose, this, &TvShowWidgetTvShow::onDeleteImage);
+        connect(image, &ClosableImage::sigImageDropped, this, &TvShowWidgetTvShow::onImageDropped);
     }
 
     QPixmap pixmap(":/img/man.png");
@@ -120,21 +127,29 @@ TvShowWidgetTvShow::TvShowWidgetTvShow(QWidget *parent) :
     connect(ui->fanarts, SIGNAL(sigRemoveImage(QByteArray)), this, SLOT(onRemoveExtraFanart(QByteArray)));
     connect(ui->fanarts, SIGNAL(sigRemoveImage(QString)), this, SLOT(onRemoveExtraFanart(QString)));
     connect(ui->btnAddExtraFanart, SIGNAL(clicked()), this, SLOT(onAddExtraFanart()));
+    connect(ui->fanarts, &ImageGallery::sigImageDropped, this, &TvShowWidgetTvShow::onExtraFanartDropped);
 
     onClear();
 
     // Connect GUI change events to movie object
     connect(ui->name, SIGNAL(textEdited(QString)), this, SLOT(onNameChange(QString)));
+    connect(ui->imdbId, SIGNAL(textEdited(QString)), this, SLOT(onImdbIdChange(QString)));
+    connect(ui->tvdbId, SIGNAL(textEdited(QString)), this, SLOT(onTvdbIdChange(QString)));
     connect(ui->sortTitle, SIGNAL(textEdited(QString)), this, SLOT(onSortTitleChange(QString)));
     connect(ui->certification, SIGNAL(editTextChanged(QString)), this, SLOT(onCertificationChange(QString)));
     connect(ui->rating, SIGNAL(valueChanged(double)), this, SLOT(onRatingChange(double)));
+    connect(ui->votes, SIGNAL(valueChanged(int)), this, SLOT(onVotesChange(int)));
+    connect(ui->top250, SIGNAL(valueChanged(int)), this, SLOT(onTop250Change(int)));
     connect(ui->firstAired, SIGNAL(dateChanged(QDate)), this, SLOT(onFirstAiredChange(QDate)));
     connect(ui->studio, SIGNAL(textEdited(QString)), this, SLOT(onStudioChange(QString)));
     connect(ui->overview, SIGNAL(textChanged()), this, SLOT(onOverviewChange()));
     connect(ui->actors, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(onActorEdited(QTableWidgetItem*)));
     connect(ui->runtime, SIGNAL(valueChanged(int)), this, SLOT(onRuntimeChange(int)));
+    connect(ui->comboStatus, SIGNAL(currentIndexChanged(int)), this, SLOT(onStatusChange(int)));
 
     onSetEnabled(false);
+
+    connect(static_cast<TheTvDb*>(Manager::instance()->tvScrapers().at(0)), SIGNAL(sigLoadProgress(TvShow*,int,int)), this, SLOT(onShowScraperProgress(TvShow*,int,int)));
 
     QPainter p;
     QPixmap revert(":/img/arrow_circle_left.png");
@@ -197,6 +212,14 @@ void TvShowWidgetTvShow::onClear()
     ui->rating->clear();
     ui->rating->blockSignals(blocked);
 
+    blocked = ui->votes->blockSignals(true);
+    ui->votes->clear();
+    ui->votes->blockSignals(blocked);
+
+    blocked = ui->top250->blockSignals(true);
+    ui->top250->clear();
+    ui->top250->blockSignals(blocked);
+
     blocked = ui->firstAired->blockSignals(true);
     ui->firstAired->setDate(QDate::currentDate());
     ui->firstAired->blockSignals(blocked);
@@ -209,7 +232,13 @@ void TvShowWidgetTvShow::onClear()
     ui->runtime->clear();
     ui->runtime->blockSignals(blocked);
 
+    blocked = ui->comboStatus->blockSignals(true);
+    ui->comboStatus->setCurrentIndex(0);
+    ui->comboStatus->blockSignals(blocked);
+
     ui->showTitle->clear();
+    ui->imdbId->clear();
+    ui->tvdbId->clear();
     ui->actors->setRowCount(0);
     ui->dir->clear();
     ui->name->clear();
@@ -274,20 +303,33 @@ void TvShowWidgetTvShow::updateTvShowInfo()
 
     ui->certification->blockSignals(true);
     ui->rating->blockSignals(true);
+    ui->votes->blockSignals(true);
+    ui->top250->blockSignals(true);
     ui->firstAired->blockSignals(true);
     ui->overview->blockSignals(true);
     ui->runtime->blockSignals(true);
+    ui->comboStatus->blockSignals(true);
 
     onClear();
 
     ui->dir->setText(m_show->dir());
     ui->name->setText(m_show->name());
+    ui->imdbId->setText(m_show->imdbId());
+    ui->tvdbId->setText(m_show->tvdbId());
     ui->sortTitle->setText(m_show->sortTitle());
     ui->rating->setValue(m_show->rating());
+    ui->votes->setValue(m_show->votes());
+    ui->top250->setValue(m_show->top250());
     ui->firstAired->setDate(m_show->firstAired());
     ui->studio->setText(m_show->network());
     ui->overview->setPlainText(m_show->overview());
     ui->runtime->setValue(m_show->runtime());
+    if (m_show->status() == "Continuing")
+        ui->comboStatus->setCurrentIndex(1);
+    else if (m_show->status() == "Ended")
+        ui->comboStatus->setCurrentIndex(2);
+    else
+        ui->comboStatus->setCurrentIndex(0);
 
     ui->actors->blockSignals(true);
     foreach (Actor *actor, m_show->actorsPointer()) {
@@ -322,9 +364,12 @@ void TvShowWidgetTvShow::updateTvShowInfo()
 
     ui->certification->blockSignals(false);
     ui->rating->blockSignals(false);
+    ui->votes->blockSignals(false);
+    ui->top250->blockSignals(false);
     ui->firstAired->blockSignals(false);
     ui->overview->blockSignals(false);
     ui->runtime->blockSignals(false);
+    ui->comboStatus->blockSignals(false);
     ui->buttonRevert->setVisible(m_show->hasChanged());
 }
 
@@ -395,6 +440,8 @@ void TvShowWidgetTvShow::onStartScraperSearch()
     TvShowSearch::instance()->setSearchType(TypeTvShow);
     TvShowSearch::instance()->exec(m_show->name(), m_show->tvdbId());
     if (TvShowSearch::instance()->result() == QDialog::Accepted) {
+        int id = NotificationBox::instance()->addProgressBar(tr("Please wait while your tv show is scraped"));
+        m_show->setProperty("progressBarId", id);
         onSetEnabled(false);
         m_show->loadData(TvShowSearch::instance()->scraperId(), Manager::instance()->tvScrapers().at(0), TvShowSearch::instance()->updateType(), TvShowSearch::instance()->infosToLoad());
         connect(m_show, SIGNAL(sigLoaded(TvShow*)), this, SLOT(onInfoLoadDone(TvShow*)), Qt::UniqueConnection);
@@ -423,6 +470,7 @@ void TvShowWidgetTvShow::onInfoLoadDone(TvShow *show)
         QMap<int, QList<Poster> > map;
         onLoadDone(show, map);
     }
+    NotificationBox::instance()->hideProgressBar(show->property("progressBarId").toInt());
 }
 
 /**
@@ -868,6 +916,18 @@ void TvShowWidgetTvShow::onNameChange(QString text)
     ui->buttonRevert->setVisible(true);
 }
 
+void TvShowWidgetTvShow::onImdbIdChange(QString text)
+{
+    m_show->setImdbId(text);
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetTvShow::onTvdbIdChange(QString text)
+{
+    m_show->setTvdbId(text);
+    ui->buttonRevert->setVisible(true);
+}
+
 void TvShowWidgetTvShow::onSortTitleChange(QString text)
 {
     m_show->setSortTitle(text);
@@ -967,6 +1027,19 @@ void TvShowWidgetTvShow::onAddExtraFanart()
     }
 }
 
+void TvShowWidgetTvShow::onExtraFanartDropped(QUrl imageUrl)
+{
+    if (!m_show)
+        return;
+    emit sigSetActionSaveEnabled(false, WidgetTvShows);
+    DownloadManagerElement d;
+    d.imageType = ImageType::TvShowExtraFanart;
+    d.url = imageUrl;
+    d.show = m_show;
+    m_posterDownloadManager->addDownload(d);
+    ui->buttonRevert->setVisible(true);
+}
+
 void TvShowWidgetTvShow::onDownloadTune()
 {
     TvTunesDialog::instance()->setTvShow(m_show);
@@ -1029,5 +1102,55 @@ void TvShowWidgetTvShow::onDeleteImage()
 
     m_show->removeImage(image->imageType());
     updateImages(QList<int>() << image->imageType());
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetTvShow::onImageDropped(int imageType, QUrl imageUrl)
+{
+    if (!m_show)
+        return;
+    ClosableImage *image = static_cast<ClosableImage*>(QObject::sender());
+    if (!image)
+        return;
+
+    emit sigSetActionSaveEnabled(false, WidgetTvShows);
+    DownloadManagerElement d;
+    d.imageType = imageType;
+    d.url = imageUrl;
+    d.show = m_show;
+    m_posterDownloadManager->addDownload(d);
+    image->setLoading(true);
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetTvShow::onVotesChange(int value)
+{
+    if (!m_show)
+        return;
+    m_show->setVotes(value);
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetTvShow::onTop250Change(int value)
+{
+    if (!m_show)
+        return;
+    m_show->setTop250(value);
+    ui->buttonRevert->setVisible(true);
+}
+
+void TvShowWidgetTvShow::onShowScraperProgress(TvShow *show, int current, int max)
+{
+    if (!show->property("progressBarId").isValid())
+        return;
+    int id = show->property("progressBarId").toInt();
+    NotificationBox::instance()->progressBarProgress(current, max, id);
+}
+
+void TvShowWidgetTvShow::onStatusChange(int index)
+{
+    if (!m_show)
+        return;
+    m_show->setStatus(ui->comboStatus->itemData(index).toString());
     ui->buttonRevert->setVisible(true);
 }

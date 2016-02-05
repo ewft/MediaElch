@@ -3,6 +3,7 @@
 #include <QPainter>
 #include "globals/Globals.h"
 #include "globals/Helper.h"
+#include "globals/Manager.h"
 
 /**
  * @brief MovieModel::MovieModel
@@ -11,8 +12,15 @@
 MovieModel::MovieModel(QObject *parent) :
     QAbstractItemModel(parent)
 {
+#ifdef Q_OS_WIN
     m_newIcon = QIcon(":/img/star_blue.png");
     m_syncIcon = QIcon(":/img/reload_orange.png");
+#else
+    MyIconFont *font = new MyIconFont(this);
+    font->initFontAwesome();
+    m_syncIcon = font->icon("refresh_cloud", QColor(248, 148, 6), QColor(255, 255, 255), "", 0, 1.0);
+    m_newIcon = font->icon("star", QColor(58, 135, 173), QColor(255, 255, 255), "", 0, 1.0);
+#endif
 }
 
 /**
@@ -51,6 +59,8 @@ void MovieModel::update()
  */
 Movie *MovieModel::movie(int row)
 {
+    if (row < 0 || row >= m_movies.count())
+        return 0;
     return m_movies.at(row);
 }
 
@@ -133,7 +143,10 @@ QVariant MovieModel::data(const QModelIndex &index, int role) const
             icon = (movie->actors().isEmpty()) ? "actors/red" : "actors/green";
             break;
         case MediaStatusTrailer:
-            icon = (movie->trailer().isEmpty() && !movie->hasLocalTrailer()) ? "trailer/red" : "trailer/green";
+            icon = (movie->trailer().isEmpty()) ? "trailer/red" : "trailer/green";
+            break;
+        case MediaStatusLocalTrailer:
+            icon = (movie->hasLocalTrailer()) ? "trailer/green" : "trailer/red";
             break;
         case MediaStatusPoster:
             icon = (movie->hasImage(ImageType::MoviePoster)) ? "poster/green" : "poster/red";
@@ -164,8 +177,12 @@ QVariant MovieModel::data(const QModelIndex &index, int role) const
             break;
         }
 
-        if (!icon.isEmpty())
-            return QIcon(":mediaStatus/" + icon);
+        if (!icon.isEmpty()) {
+            static QHash<QString, QIcon> icons;
+            if (!icons.contains(icon))
+                icons.insert(icon, QIcon(":mediaStatus/" + icon));
+            return icons.value(icon);
+        }
 
     } else if (role == Qt::ToolTipRole) {
         return MovieModel::mediaStatusToText(MovieModel::columnToMediaStatus(index.column()));
@@ -241,7 +258,7 @@ int MovieModel::mediaStatusToColumn(MediaStatusColumns column)
 {
     switch (column) {
     case MediaStatusActors:
-        return 8;
+        return 9;
         break;
     case MediaStatusExtraArts:
         return 5;
@@ -256,10 +273,13 @@ int MovieModel::mediaStatusToColumn(MediaStatusColumns column)
         return 2;
         break;
     case MediaStatusStreamDetails:
-        return 7;
+        return 8;
         break;
     case MediaStatusTrailer:
         return 6;
+        break;
+    case MediaStatusLocalTrailer:
+        return 7;
         break;
     case MediaStatusId:
         return 1;
@@ -296,6 +316,8 @@ QString MovieModel::mediaStatusToText(MediaStatusColumns column)
         return tr("Stream Details");
     case MediaStatusTrailer:
         return tr("Trailer");
+    case MediaStatusLocalTrailer:
+        return tr("Local Trailer");
     case MediaStatusId:
         return tr("IMDB ID");
     default:

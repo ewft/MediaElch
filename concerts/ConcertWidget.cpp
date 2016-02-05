@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include "concerts/ConcertSearch.h"
+#include "concerts/ConcertFilesWidget.h"
 #include "data/ImageCache.h"
 #include "globals/ComboDelegate.h"
 #include "globals/Globals.h"
@@ -61,8 +62,9 @@ ConcertWidget::ConcertWidget(QWidget *parent) :
     ui->cdArt->setImageType(ImageType::ConcertCdArt);
     ui->clearArt->setImageType(ImageType::ConcertClearArt);
     foreach (ClosableImage *image, ui->artStackedWidget->findChildren<ClosableImage*>()) {
-        connect(image, SIGNAL(clicked()), this, SLOT(onChooseImage()));
-        connect(image, SIGNAL(sigClose()), this, SLOT(onDeleteImage()));
+        connect(image, &ClosableImage::clicked, this, &ConcertWidget::onChooseImage);
+        connect(image, &ClosableImage::sigClose, this, &ConcertWidget::onDeleteImage);
+        connect(image, &ClosableImage::sigImageDropped, this, &ConcertWidget::onImageDropped);
     }
 
     connect(ui->name, SIGNAL(textChanged(QString)), this, SLOT(concertNameChanged(QString)));
@@ -79,11 +81,11 @@ ConcertWidget::ConcertWidget(QWidget *parent) :
     connect(ui->tagCloud, SIGNAL(activated(QString)), this, SLOT(addTag(QString)));
     connect(ui->tagCloud, SIGNAL(deactivated(QString)), this, SLOT(removeTag(QString)));
 
-    ui->poster->setDefaultPixmap(QPixmap(":/img/film_reel.png"));
-    ui->backdrop->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->logo->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->clearArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->cdArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    ui->poster->setDefaultPixmap(QPixmap(":/img/placeholders/poster.png"));
+    ui->backdrop->setDefaultPixmap(QPixmap(":/img/placeholders/fanart.png"));
+    ui->logo->setDefaultPixmap(QPixmap(":/img/placeholders/logo.png"));
+    ui->clearArt->setDefaultPixmap(QPixmap(":/img/placeholders/clear_art.png"));
+    ui->cdArt->setDefaultPixmap(QPixmap(":/img/placeholders/cd_art.png"));
 
     m_loadingMovie = new QMovie(":/img/spinner.gif");
     m_loadingMovie->start();
@@ -98,6 +100,7 @@ ConcertWidget::ConcertWidget(QWidget *parent) :
     connect(ui->fanarts, SIGNAL(sigRemoveImage(QByteArray)), this, SLOT(onRemoveExtraFanart(QByteArray)));
     connect(ui->fanarts, SIGNAL(sigRemoveImage(QString)), this, SLOT(onRemoveExtraFanart(QString)));
     connect(ui->btnAddExtraFanart, SIGNAL(clicked()), this, SLOT(onAddExtraFanart()));
+    connect(ui->fanarts, &ImageGallery::sigImageDropped, this, &ConcertWidget::onExtraFanartDropped);
 
     // Connect GUI change events to concert object
     connect(ui->name, SIGNAL(textEdited(QString)), this, SLOT(onNameChange(QString)));
@@ -185,11 +188,12 @@ void ConcertWidget::clear()
     ui->playcount->clear();
     ui->lastPlayed->setDateTime(QDateTime::currentDateTime());
     ui->overview->clear();
-    ui->poster->setPixmap(QPixmap(":/img/film_reel.png"));
-    ui->backdrop->setPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->logo->setPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->clearArt->setPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->cdArt->setPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    ui->poster->clear();
+    ui->backdrop->clear();
+    ui->logo->clear();
+    ui->clearArt->clear();
+    ui->cdArt->clear();
     ui->genreCloud->clear();
     ui->tagCloud->clear();
 
@@ -619,15 +623,32 @@ void ConcertWidget::onReloadStreamDetails()
  */
 void ConcertWidget::onSaveInformation()
 {
-    qDebug() << "Entered";
+    QList<Concert*> concerts = ConcertFilesWidget::instance()->selectedConcerts();
+    if (concerts.count() == 0)
+        concerts.append(m_concert);
+
     setDisabledTrue();
     m_savingWidget->show();
-    m_concert->controller()->saveData(Manager::instance()->mediaCenterInterfaceConcert());
-    m_concert->controller()->loadData(Manager::instance()->mediaCenterInterfaceConcert(), true);
-    updateConcertInfo();
+
+    if (concerts.count() == 1) {
+        m_concert->controller()->saveData(Manager::instance()->mediaCenterInterfaceConcert());
+        m_concert->controller()->loadData(Manager::instance()->mediaCenterInterfaceConcert(), true);
+        updateConcertInfo();
+        NotificationBox::instance()->showMessage(tr("<b>\"%1\"</b> Saved").arg(m_concert->name()));
+    } else {
+        foreach (Concert *concert, concerts) {
+            if (concert->hasChanged()) {
+                concert->controller()->saveData(Manager::instance()->mediaCenterInterfaceConcert());
+                concert->controller()->loadData(Manager::instance()->mediaCenterInterfaceConcert(), true);
+                if (m_concert == concert)
+                    updateConcertInfo();
+            }
+        }
+        NotificationBox::instance()->showMessage(tr("Concerts Saved"));
+    }
+
     setEnabledTrue();
     m_savingWidget->hide();
-    NotificationBox::instance()->showMessage(tr("<b>\"%1\"</b> Saved").arg(m_concert->name()));
     ui->buttonRevert->setVisible(false);
 }
 
@@ -939,6 +960,16 @@ void ConcertWidget::onAddExtraFanart()
     }
 }
 
+void ConcertWidget::onExtraFanartDropped(QUrl imageUrl)
+{
+    if (!m_concert)
+        return;
+    ui->fanarts->setLoading(true);
+    emit setActionSaveEnabled(false, WidgetConcerts);
+    m_concert->controller()->loadImages(ImageType::ConcertExtraFanart, QList<QUrl>() << imageUrl);
+    ui->buttonRevert->setVisible(true);
+}
+
 void ConcertWidget::onChooseImage()
 {
     if (m_concert == 0)
@@ -977,5 +1008,14 @@ void ConcertWidget::onDeleteImage()
 
     m_concert->removeImage(image->imageType());
     updateImages(QList<int>() << image->imageType());
+    ui->buttonRevert->setVisible(true);
+}
+
+void ConcertWidget::onImageDropped(int imageType, QUrl imageUrl)
+{
+    if (!m_concert)
+        return;
+    emit setActionSaveEnabled(false, WidgetConcerts);
+    m_concert->controller()->loadImage(imageType, imageUrl);
     ui->buttonRevert->setVisible(true);
 }

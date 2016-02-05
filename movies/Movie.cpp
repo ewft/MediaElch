@@ -1255,6 +1255,21 @@ bool Movie::hasLocalTrailer() const
     return !dir.entryList(QStringList() << trailerFilter).isEmpty();
 }
 
+QString Movie::localTrailerFileName() const
+{
+    if (files().count() == 0)
+        return QString();
+    QFileInfo fi(files().first());
+    QString trailerFilter = QString("%1-trailer*").arg(fi.completeBaseName());
+    QDir dir(fi.canonicalPath());
+
+    QStringList contents = dir.entryList(QStringList() << trailerFilter);
+    if (contents.isEmpty())
+        return QString();
+
+    return dir.absolutePath() + "/" + contents.first();
+}
+
 void Movie::addExtraFanart(QByteArray fanart)
 {
     m_extraFanartImagesToAdd.append(fanart);
@@ -1395,6 +1410,29 @@ QList<int> Movie::imageTypes()
                         << ImageType::MovieCdArt << ImageType::MovieClearArt
                         << ImageType::MovieLogo << ImageType::MovieThumb
                         << ImageType::MovieBackdrop;
+}
+
+QList<Subtitle *> Movie::subtitles() const
+{
+    return m_subtitles;
+}
+
+void Movie::setSubtitles(const QList<Subtitle *> &subtitles)
+{
+    m_subtitles = subtitles;
+}
+
+void Movie::addSubtitle(Subtitle *subtitle, bool fromLoad)
+{
+    m_subtitles.append(subtitle);
+    connect(subtitle, &Subtitle::sigChanged, this, &Movie::onSubtitleChanged);
+    if (!fromLoad)
+        setChanged(true);
+}
+
+void Movie::onSubtitleChanged()
+{
+    setChanged(true);
 }
 
 void Movie::setLabel(int label)

@@ -1,6 +1,7 @@
 #include "MusicWidgetAlbum.h"
 #include "ui_MusicWidgetAlbum.h"
 
+#include <QGLFormat>
 #include <QPainter>
 #include "../globals/Globals.h"
 #include "../globals/Helper.h"
@@ -33,8 +34,8 @@ MusicWidgetAlbum::MusicWidgetAlbum(QWidget *parent) :
     ui->labelCover->setFont(font);
     ui->labelDiscArt->setFont(font);
 
-    ui->cover->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->discArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    ui->cover->setDefaultPixmap(QPixmap(":/img/placeholders/poster.png"));
+    ui->discArt->setDefaultPixmap(QPixmap(":/img/placeholders/cd_art.png"));
 
     ui->genreCloud->setText(tr("Genres"));
     ui->genreCloud->setPlaceholder(tr("Add Genre"));
@@ -54,8 +55,20 @@ MusicWidgetAlbum::MusicWidgetAlbum(QWidget *parent) :
     ui->cover->setImageType(ImageType::AlbumThumb);
     ui->discArt->setImageType(ImageType::AlbumCdArt);
     foreach (ClosableImage *image, ui->groupBox_3->findChildren<ClosableImage*>()) {
-        connect(image, SIGNAL(clicked()), this, SLOT(onChooseImage()));
-        connect(image, SIGNAL(sigClose()), this, SLOT(onDeleteImage()));
+        connect(image, &ClosableImage::clicked, this, &MusicWidgetAlbum::onChooseImage);
+        connect(image, &ClosableImage::sigClose, this, &MusicWidgetAlbum::onDeleteImage);
+        connect(image, &ClosableImage::sigImageDropped, this, &MusicWidgetAlbum::onImageDropped);
+    }
+
+    m_bookletWidget = 0;
+
+    if (QGLFormat::openGLVersionFlags() & QGLFormat::OpenGL_Version_1_5) {
+        m_bookletWidget = new ImageWidget(this);
+        ui->verticalLayout_2->insertWidget(0, m_bookletWidget, 1);
+        connect(m_bookletWidget, &ImageWidget::sigImageDropped, this, &MusicWidgetAlbum::onBookletsDropped);
+        connect(ui->btnAddExtraFanart, SIGNAL(clicked()), this, SLOT(onAddBooklet()));
+    } else {
+        ui->tabWidget->removeTab(2);
     }
 
     connect(ui->title, SIGNAL(textChanged(QString)), ui->albumName, SLOT(setText(QString)));
@@ -71,7 +84,8 @@ MusicWidgetAlbum::MusicWidgetAlbum(QWidget *parent) :
     connect(ui->year, SIGNAL(valueChanged(int)), this, SLOT(onYearChanged(int)));
     connect(ui->rating, SIGNAL(valueChanged(double)), this, SLOT(onRatingChanged(double)));
     connect(ui->review, SIGNAL(textChanged()), this, SLOT(onReviewChanged()));
-    connect(ui->musicBrainzId, SIGNAL(textEdited(QString)), this, SLOT(onItemChanged(QString)));
+    connect(ui->musicBrainzAlbumId, SIGNAL(textEdited(QString)), this, SLOT(onItemChanged(QString)));
+    connect(ui->musicBrainzReleaseGroupId, SIGNAL(textEdited(QString)), this, SLOT(onItemChanged(QString)));
 
     QPainter p;
     QPixmap revert(":/img/arrow_circle_left.png");
@@ -103,6 +117,7 @@ void MusicWidgetAlbum::setAlbum(Album *album)
     connect(m_album->controller(), SIGNAL(sigLoadingImages(Album*,QList<int>)), this, SLOT(onLoadingImages(Album*,QList<int>)), Qt::UniqueConnection);
     connect(m_album->controller(), SIGNAL(sigLoadImagesStarted(Album*)), this, SLOT(onLoadImagesStarted(Album*)), Qt::UniqueConnection);
     connect(m_album->controller(), SIGNAL(sigImage(Album*,int,QByteArray)), this, SLOT(onSetImage(Album*,int,QByteArray)), Qt::UniqueConnection);
+    connect(m_album->bookletModel(), SIGNAL(hasChangedChanged()), this, SLOT(onBookletModelChanged()), Qt::UniqueConnection);
 
     onSetEnabled(!album->controller()->downloadsInProgress());
 }
@@ -129,7 +144,8 @@ void MusicWidgetAlbum::onClear()
     clearContents(ui->artist);
     clearContents(ui->label);
     clearContents(ui->releaseDate);
-    clearContents(ui->musicBrainzId);
+    clearContents(ui->musicBrainzAlbumId);
+    clearContents(ui->musicBrainzReleaseGroupId);
     bool blocked = ui->review->blockSignals(true);
     ui->review->clear();
     ui->review->blockSignals(blocked);
@@ -145,6 +161,9 @@ void MusicWidgetAlbum::onClear()
     ui->moodCloud->clear();
     ui->cover->clear();
     ui->discArt->clear();
+
+    if (m_bookletWidget)
+        m_bookletWidget->setAlbum(0);
 
     ui->buttonRevert->setVisible(false);
 }
@@ -189,6 +208,7 @@ void MusicWidgetAlbum::onStartScraperSearch()
     if (MusicSearch::instance()->result() == QDialog::Accepted) {
         onSetEnabled(false);
         m_album->controller()->loadData(MusicSearch::instance()->scraperId(),
+                                        MusicSearch::instance()->scraperId2(),
                                         Manager::instance()->musicScrapers().at(MusicSearch::instance()->scraperNo()),
                                         MusicSearch::instance()->infosToLoad());
     } else {
@@ -210,7 +230,8 @@ void MusicWidgetAlbum::updateAlbumInfo()
     setContent(ui->artist, m_album->artist());
     setContent(ui->label, m_album->label());
     setContent(ui->releaseDate, m_album->releaseDate());
-    setContent(ui->musicBrainzId, m_album->mbId());
+    setContent(ui->musicBrainzAlbumId, m_album->mbAlbumId());
+    setContent(ui->musicBrainzReleaseGroupId, m_album->mbReleaseGroupId());
     ui->review->blockSignals(true);
     ui->review->setPlainText(m_album->review());
     ui->review->blockSignals(false);
@@ -245,6 +266,10 @@ void MusicWidgetAlbum::updateAlbumInfo()
     ui->genreCloud->setTags(genres, m_album->genres());
     ui->styleCloud->setTags(styles, m_album->styles());
     ui->moodCloud->setTags(moods, m_album->moods());
+
+    m_album->loadBooklets(Manager::instance()->mediaCenterInterface());
+    if (m_bookletWidget)
+        m_bookletWidget->setAlbum(m_album);
 }
 
 void MusicWidgetAlbum::updateImage(int imageType, ClosableImage *image)
@@ -276,8 +301,10 @@ void MusicWidgetAlbum::onItemChanged(QString text)
         m_album->setLabel(text);
     else if (property == "releaseDate")
         m_album->setReleaseDate(text);
-    else if (property == "mbid")
-        m_album->setMbId(text);
+    else if (property == "mbAlbumId")
+        m_album->setMbAlbumId(text);
+    else if (property == "mbReleaseGroupId")
+        m_album->setMbReleaseGroupId(text);
 
     ui->buttonRevert->setVisible(true);
 }
@@ -312,6 +339,7 @@ void MusicWidgetAlbum::onRevertChanges()
         return;
 
     m_album->clearImages();
+    m_album->bookletModel()->clear();
     m_album->controller()->loadData(Manager::instance()->mediaCenterInterface(), true);
     updateAlbumInfo();
 }
@@ -369,7 +397,7 @@ void MusicWidgetAlbum::onChooseImage()
     ImageDialog::instance()->exec(image->imageType());
 
     if (ImageDialog::instance()->result() == QDialog::Accepted) {
-        emit sigSetActionSaveEnabled(false, WidgetMovies);
+        emit sigSetActionSaveEnabled(false, WidgetMusic);
         m_album->controller()->loadImage(image->imageType(), ImageDialog::instance()->imageUrl());
         ui->buttonRevert->setVisible(true);
     }
@@ -386,6 +414,15 @@ void MusicWidgetAlbum::onDeleteImage()
 
     m_album->removeImage(image->imageType());
     updateImage(image->imageType(), image);
+    ui->buttonRevert->setVisible(true);
+}
+
+void MusicWidgetAlbum::onImageDropped(int imageType, QUrl imageUrl)
+{
+    if (!m_album)
+        return;
+    emit sigSetActionSaveEnabled(false, WidgetMusic);
+    m_album->controller()->loadImage(imageType, imageUrl);
     ui->buttonRevert->setVisible(true);
 }
 
@@ -406,6 +443,8 @@ void MusicWidgetAlbum::onLoadDone(Album *album)
     if (m_album != album)
         return;
 
+    if (m_bookletWidget)
+        m_bookletWidget->setLoading(false);
     onSetEnabled(true);
 }
 
@@ -426,6 +465,9 @@ void MusicWidgetAlbum::onLoadingImages(Album *album, QList<int> imageTypes)
         }
     }
 
+    if (m_bookletWidget && imageTypes.contains(ImageType::AlbumBooklet))
+        m_bookletWidget->setLoading(true);
+
     ui->groupBox_3->update();
 }
 
@@ -445,4 +487,45 @@ void MusicWidgetAlbum::onSetImage(Album *album, int type, QByteArray data)
             image->setImage(data);
         }
     }
+}
+
+void MusicWidgetAlbum::onBookletModelChanged()
+{
+    ImageModel *model = static_cast<ImageModel*>(sender());
+    if (!model)
+        return;
+    if (m_album != static_cast<Album*>(model->parent()))
+        return;
+    if (model->hasChanged()) {
+        ui->buttonRevert->setVisible(true);
+        m_album->setHasChanged(true);
+    }
+}
+
+void MusicWidgetAlbum::onAddBooklet()
+{
+    if (!m_album)
+        return;
+
+    ImageDialog::instance()->setImageType(ImageType::AlbumBooklet);
+    ImageDialog::instance()->clear();
+    ImageDialog::instance()->setMultiSelection(true);
+    ImageDialog::instance()->setAlbum(m_album);
+    ImageDialog::instance()->setDownloads(QList<Poster>());
+    ImageDialog::instance()->exec(ImageType::AlbumBooklet);
+
+    if (ImageDialog::instance()->result() == QDialog::Accepted && !ImageDialog::instance()->imageUrls().isEmpty()) {
+        if (m_bookletWidget)
+            m_bookletWidget->setLoading(true);
+        emit sigSetActionSaveEnabled(false, WidgetMusic);
+        m_album->controller()->loadImages(ImageType::AlbumBooklet, ImageDialog::instance()->imageUrls());
+        ui->buttonRevert->setVisible(true);
+    }
+}
+
+void MusicWidgetAlbum::onBookletsDropped(QList<QUrl> urls)
+{
+    if (m_bookletWidget)
+        m_bookletWidget->setLoading(true);
+    m_album->controller()->loadImages(ImageType::AlbumBooklet, urls);
 }

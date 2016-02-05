@@ -20,6 +20,7 @@
 #include "globals/TrailerDialog.h"
 #include "notifications/NotificationBox.h"
 #include "main/MainWindow.h"
+#include "movies/FilesWidget.h"
 #include "movies/MovieSearch.h"
 
 /**
@@ -38,6 +39,7 @@ MovieWidget::MovieWidget(QWidget *parent) :
 
     ui->actors->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui->actors->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    ui->subtitles->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     ui->artStackedWidget->setAnimation(QEasingCurve::OutCubic);
     ui->artStackedWidget->setSpeed(300);
     ui->localTrailer->setBadgeType(Badge::LabelSuccess);
@@ -68,13 +70,17 @@ MovieWidget::MovieWidget(QWidget *parent) :
 
     m_movie = 0;
 
-    ui->poster->setDefaultPixmap(QPixmap(":/img/film_reel.png"));
-    ui->backdrop->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->logo->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->clearArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->cdArt->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->thumb->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(64, 64, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    ui->banner->setDefaultPixmap(QPixmap(":/img/pictures_alt.png").scaled(48, 48, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    ui->poster->setDefaultPixmap(QPixmap(":/img/placeholders/poster.png"));
+    ui->backdrop->setDefaultPixmap(QPixmap(":/img/placeholders/fanart.png"));
+    ui->logo->setDefaultPixmap(QPixmap(":/img/placeholders/logo.png"));
+    ui->clearArt->setDefaultPixmap(QPixmap(":/img/placeholders/clear_art.png"));
+    ui->cdArt->setDefaultPixmap(QPixmap(":/img/placeholders/cd_art.png"));
+    ui->thumb->setDefaultPixmap(QPixmap(":/img/placeholders/thumb.png"));
+    ui->banner->setDefaultPixmap(QPixmap(":/img/placeholders/banner.png"));
+
+    ui->buttonDownloadTrailer->setIcon(Manager::instance()->iconFont()->icon("download", QColor(150, 150, 150), "", -1, 1.0));
+    ui->buttonYoutubeDummy->setIcon(Manager::instance()->iconFont()->icon("pen", QColor(150, 150, 150), "", -1, 1.0));
+    ui->buttonPlayLocalTrailer->setIcon(Manager::instance()->iconFont()->icon("play", QColor(150, 150, 150), "", -1, 1.0));
 
     ui->genreCloud->setText(tr("Genres"));
     ui->genreCloud->setPlaceholder(tr("Add Genre"));
@@ -107,8 +113,9 @@ MovieWidget::MovieWidget(QWidget *parent) :
     ui->thumb->setImageType(ImageType::MovieThumb);
     ui->clearArt->setImageType(ImageType::MovieClearArt);
     foreach (ClosableImage *image, ui->artStackedWidget->findChildren<ClosableImage*>()) {
-        connect(image, SIGNAL(clicked()), this, SLOT(onChooseImage()));
-        connect(image, SIGNAL(sigClose()), this, SLOT(onDeleteImage()));
+        connect(image, &ClosableImage::clicked, this, &MovieWidget::onChooseImage);
+        connect(image, &ClosableImage::sigClose, this, &MovieWidget::onDeleteImage);
+        connect(image, &ClosableImage::sigImageDropped, this, &MovieWidget::onImageDropped);
     }
 
     connect(ui->name, SIGNAL(textChanged(QString)), this, SLOT(movieNameChanged(QString)));
@@ -117,14 +124,18 @@ MovieWidget::MovieWidget(QWidget *parent) :
     connect(ui->actors, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(onActorEdited(QTableWidgetItem*)));
     connect(ui->actors, SIGNAL(itemSelectionChanged()), this, SLOT(onActorChanged()));
     connect(ui->actor, SIGNAL(clicked()), this, SLOT(onChangeActorImage()));
+    connect(ui->subtitles, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(onSubtitleEdited(QTableWidgetItem*)));
     connect(ui->buttonRevert, SIGNAL(clicked()), this, SLOT(onRevertChanges()));
     connect(ui->buttonReloadStreamDetails, SIGNAL(clicked()), this, SLOT(onReloadStreamDetails()));
-    connect(ui->buttonDownloadTrailer, SIGNAL(clicked()), this, SLOT(onDownloadTrailer()));
-    connect(ui->buttonYoutubeDummy, SIGNAL(clicked()), this, SLOT(onInsertYoutubeLink()));
+
+    connect(ui->buttonDownloadTrailer, &QToolButton::clicked, this, &MovieWidget::onDownloadTrailer);
+    connect(ui->buttonYoutubeDummy, &QToolButton::clicked, this, &MovieWidget::onInsertYoutubeLink);
+    connect(ui->buttonPlayLocalTrailer, &QToolButton::clicked, this, &MovieWidget::onPlayLocalTrailer);
 
     connect(ui->fanarts, SIGNAL(sigRemoveImage(QByteArray)), this, SLOT(onRemoveExtraFanart(QByteArray)));
     connect(ui->fanarts, SIGNAL(sigRemoveImage(QString)), this, SLOT(onRemoveExtraFanart(QString)));
     connect(ui->btnAddExtraFanart, SIGNAL(clicked()), this, SLOT(onAddExtraFanart()));
+    connect(ui->fanarts, &ImageGallery::sigImageDropped, this, &MovieWidget::onExtraFanartDropped);
 
     m_loadingMovie = new QMovie(":/img/spinner.gif");
     m_loadingMovie->start();
@@ -303,6 +314,10 @@ void MovieWidget::clear()
     blocked = ui->actors->blockSignals(true);
     ui->actors->setRowCount(0);
     ui->actors->blockSignals(false);
+
+    blocked = ui->subtitles->blockSignals(true);
+    ui->subtitles->setRowCount(0);
+    ui->subtitles->blockSignals(false);
 
     ui->videoCodec->clear();
     ui->videoScantype->clear();
@@ -536,6 +551,7 @@ void MovieWidget::updateMovieInfo()
     ui->overview->blockSignals(true);
     ui->outline->blockSignals(true);
     ui->actors->blockSignals(true);
+    ui->subtitles->blockSignals(true);
 
     clear();
 
@@ -592,6 +608,28 @@ void MovieWidget::updateMovieInfo()
         ui->actors->item(row, 1)->setData(Qt::UserRole, QVariant::fromValue(actor));
     }
     ui->actors->blockSignals(false);
+
+    ui->subtitles->blockSignals(true);
+    foreach (Subtitle *subtitle, m_movie->subtitles()) {
+        int row = ui->subtitles->rowCount();
+        ui->subtitles->insertRow(row);
+
+        QTableWidgetItem *item0 = new QTableWidgetItem(subtitle->files().join(", "));
+        item0->setFlags(Qt::ItemIsSelectable);
+        item0->setData(Qt::UserRole, QVariant::fromValue(subtitle));
+        ui->subtitles->setItem(row, 0, item0);
+
+        QTableWidgetItem *item1 = new QTableWidgetItem(subtitle->language());
+        item1->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
+        ui->subtitles->setItem(row, 1, item1);
+
+        QTableWidgetItem *item2 = new QTableWidgetItem;
+        item2->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+        item2->setCheckState(subtitle->forced() ? Qt::Checked : Qt::Unchecked);
+        ui->subtitles->setItem(row, 2, item2);
+    }
+
+    ui->subtitles->blockSignals(false);
 
     QStringList genres;
     QStringList tags;
@@ -791,6 +829,14 @@ void MovieWidget::onDownloadTrailer()
     ui->localTrailer->setVisible(m_movie->hasLocalTrailer());
 }
 
+void MovieWidget::onPlayLocalTrailer()
+{
+    if (!m_movie && !m_movie->hasLocalTrailer())
+        return;
+
+    QDesktopServices::openUrl(QUrl::fromLocalFile(m_movie->localTrailerFileName()));
+}
+
 /**
  * @brief Saves movie information
  */
@@ -798,15 +844,42 @@ void MovieWidget::saveInformation()
 {
     qDebug() << "Entered";
     setDisabledTrue();
-    int id = NotificationBox::instance()->showMessage(tr("Saving movie..."));
+
+    QList<Movie*> movies = FilesWidget::instance()->selectedMovies();
+    if (movies.isEmpty())
+        movies.append(m_movie);
+
     m_savingWidget->show();
-    m_movie->controller()->saveData(Manager::instance()->mediaCenterInterface());
-    m_movie->controller()->loadData(Manager::instance()->mediaCenterInterface(), true);
-    updateMovieInfo();
+    if (movies.count() > 0) {
+        int counter = 0;
+        int moviesToSave = movies.count();
+
+        NotificationBox::instance()->showProgressBar(tr("Saving movies..."), Constants::MovieWidgetProgressMessageId);
+        NotificationBox::instance()->progressBarProgress(0, moviesToSave, Constants::MovieWidgetProgressMessageId);
+        qApp->processEvents();
+        foreach (Movie *movie, movies) {
+            counter++;
+            if (movie->hasChanged()) {
+                NotificationBox::instance()->progressBarProgress(counter, moviesToSave, Constants::MovieWidgetProgressMessageId);
+                qApp->processEvents();
+                movie->controller()->saveData(Manager::instance()->mediaCenterInterface());
+                movie->controller()->loadData(Manager::instance()->mediaCenterInterface(), true);
+                if (m_movie == movie)
+                    updateMovieInfo();
+            }
+        }
+        NotificationBox::instance()->hideProgressBar(Constants::MovieWidgetProgressMessageId);
+        NotificationBox::instance()->showMessage(tr("Movies Saved"));
+    } else {
+        int id = NotificationBox::instance()->showMessage(tr("Saving movie..."));
+        m_movie->controller()->saveData(Manager::instance()->mediaCenterInterface());
+        m_movie->controller()->loadData(Manager::instance()->mediaCenterInterface(), true);
+        updateMovieInfo();
+        NotificationBox::instance()->removeMessage(id);
+        NotificationBox::instance()->showMessage(tr("<b>\"%1\"</b> Saved").arg(m_movie->name()));
+    }
     setEnabledTrue();
     m_savingWidget->hide();
-    NotificationBox::instance()->removeMessage(id);
-    NotificationBox::instance()->showMessage(tr("<b>\"%1\"</b> Saved").arg(m_movie->name()));
     ui->buttonRevert->setVisible(false);
 }
 
@@ -909,6 +982,19 @@ void MovieWidget::onActorEdited(QTableWidgetItem *item)
         actor->name = item->text();
     else if (item->column() == 1)
         actor->role = item->text();
+    m_movie->setChanged(true);
+    ui->buttonRevert->setVisible(true);
+}
+
+void MovieWidget::onSubtitleEdited(QTableWidgetItem *item)
+{
+    Subtitle *subtitle = ui->subtitles->item(item->row(), 0)->data(Qt::UserRole).value<Subtitle*>();
+    if (!subtitle)
+        return;
+    if (item->column() == 1)
+        subtitle->setLanguage(item->text());
+    else if (item->column() == 2)
+        subtitle->setForced(item->checkState() == Qt::Checked);
     m_movie->setChanged(true);
     ui->buttonRevert->setVisible(true);
 }
@@ -1361,6 +1447,16 @@ void MovieWidget::onAddExtraFanart()
     }
 }
 
+void MovieWidget::onExtraFanartDropped(QUrl imageUrl)
+{
+    if (!m_movie)
+        return;
+    ui->fanarts->setLoading(true);
+    emit setActionSaveEnabled(false, WidgetMovies);
+    m_movie->controller()->loadImages(ImageType::MovieExtraFanart, QList<QUrl>() << imageUrl);
+    ui->buttonRevert->setVisible(true);
+}
+
 void MovieWidget::onInsertYoutubeLink()
 {
     if (Settings::instance()->useYoutubePluginUrls())
@@ -1397,6 +1493,15 @@ void MovieWidget::onChooseImage()
         m_movie->controller()->loadImage(image->imageType(), ImageDialog::instance()->imageUrl());
         ui->buttonRevert->setVisible(true);
     }
+}
+
+void MovieWidget::onImageDropped(int imageType, QUrl imageUrl)
+{
+    if (!m_movie)
+        return;
+    emit setActionSaveEnabled(false, WidgetMovies);
+    m_movie->controller()->loadImage(imageType, imageUrl);
+    ui->buttonRevert->setVisible(true);
 }
 
 void MovieWidget::onDeleteImage()

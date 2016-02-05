@@ -23,6 +23,7 @@ public:
     explicit TvShowWidgetEpisode(QWidget *parent = 0);
     ~TvShowWidgetEpisode();
     void setEpisode(TvShowEpisode *episode);
+    void updateEpisodeInfo();
 
 public slots:
     void onSetEnabled(bool enabled);
@@ -44,9 +45,11 @@ private slots:
     void onRemoveWriter();
     void onChooseThumbnail();
     void onDeleteThumbnail();
+    void onImageDropped(int imageType, QUrl imageUrl);
     void onPosterDownloadFinished(DownloadManagerElement elem);
     void onLoadDone();
     void onRevertChanges();
+    void onCaptureImage();
 
     void onNameChange(QString text);
     void onShowTitleChange(QString text);
@@ -55,6 +58,8 @@ private slots:
     void onDisplaySeasonChange(int value);
     void onDisplayEpisodeChange(int value);
     void onRatingChange(double value);
+    void onVotesChange(int value);
+    void onTop250Change(int value);
     void onCertificationChange(QString text);
     void onFirstAiredChange(QDate date);
     void onPlayCountChange(int value);
@@ -84,7 +89,6 @@ private:
     QList< QList<QLineEdit*> > m_streamDetailsAudio;
     QList< QList<QLineEdit*> > m_streamDetailsSubtitles;
 
-    void updateEpisodeInfo();
 };
 
 #endif // TVSHOWWIDGETEPISODE_H

@@ -20,6 +20,7 @@ public:
     explicit MusicWidgetArtist(QWidget *parent = 0);
     ~MusicWidgetArtist();
     void setArtist(Artist *artist);
+    void updateArtistInfo();
 
 public slots:
     void onSetEnabled(bool enabled);
@@ -42,6 +43,7 @@ private slots:
     void onRemoveCloudItem(QString text);
     void onChooseImage();
     void onDeleteImage();
+    void onImageDropped(int imageType, QUrl imageUrl);
     void onInfoLoadDone(Artist *artist);
     void onLoadDone(Artist *artist);
     void onDownloadProgress(Artist *artist, int current, int maximum);
@@ -51,6 +53,7 @@ private slots:
     void onRemoveExtraFanart(const QString &file);
     void onRemoveExtraFanart(const QByteArray &image);
     void onAddExtraFanart();
+    void onExtraFanartDropped(QUrl imageUrl);
     void onAddAlbum();
     void onRemoveAlbum();
     void onAlbumEdited(QTableWidgetItem *item);
@@ -59,7 +62,6 @@ private:
     Ui::MusicWidgetArtist *ui;
     QPointer<Artist> m_artist;
 
-    void updateArtistInfo();
     void clearContents(QLineEdit *widget);
     void setContent(QLineEdit *widget, const QString &content);
     void updateImage(int imageType, ClosableImage *image);

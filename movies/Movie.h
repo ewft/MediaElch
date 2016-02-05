@@ -12,6 +12,7 @@
 #include "data/MediaCenterInterface.h"
 #include "data/ScraperInterface.h"
 #include "data/StreamDetails.h"
+#include "data/Subtitle.h"
 #include "movies/MovieController.h"
 
 class MovieController;
@@ -83,6 +84,7 @@ public:
     virtual QDateTime dateAdded() const;
 
     bool hasChanged() const;
+    QString localTrailerFileName() const;
 
     void setFiles(QStringList files);
     void setName(QString name);
@@ -175,8 +177,15 @@ public:
     static bool lessThan(Movie *a, Movie *b);
     static QList<int> imageTypes();
 
+    QList<Subtitle *> subtitles() const;
+    void setSubtitles(const QList<Subtitle *> &subtitles);
+    void addSubtitle(Subtitle *subtitle, bool fromLoad = false);
+
 signals:
     void sigChanged(Movie*);
+
+private slots:
+    void onSubtitleChanged();
 
 private:
     MovieController *m_controller;
@@ -234,6 +243,7 @@ private:
     QDateTime m_dateAdded;
     DiscType m_discType;
     int m_label;
+    QList<Subtitle *> m_subtitles;
 
     // Images
     QMap<int, QByteArray> m_images;

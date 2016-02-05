@@ -38,6 +38,7 @@ public slots:
     void setEnabledTrue(Movie *movie = 0);
     void setDisabledTrue();
     void setBigWindow(bool bigWindow);
+    void updateMovieInfo();
 
 protected:
     void resizeEvent(QResizeEvent *event);
@@ -56,6 +57,8 @@ private slots:
     void onLoadingImages(Movie *movie, QList<int> imageTypes);
     void onDownloadProgress(Movie *movie, int current, int maximum);
     void onSetImage(Movie *movie, int type, QByteArray data);
+    void onImageDropped(int imageType, QUrl imageUrl);
+    void onExtraFanartDropped(QUrl imageUrl);
 
     void onChooseImage();
     void onDeleteImage();
@@ -99,11 +102,13 @@ private slots:
     void onImdbIdChange(QString text);
 
     void onActorEdited(QTableWidgetItem *item);
+    void onSubtitleEdited(QTableWidgetItem *item);
     void onStreamDetailsEdited();
     void onReloadStreamDetails();
     void updateStreamDetails(bool reloadFromFile = false);
     void onDownloadTrailer();
     void onInsertYoutubeLink();
+    void onPlayLocalTrailer();
 
     void onRemoveExtraFanart(const QString &file);
     void onRemoveExtraFanart(const QByteArray &image);
@@ -120,7 +125,6 @@ private:
     QList< QList<QLineEdit*> > m_streamDetailsAudio;
     QList< QList<QLineEdit*> > m_streamDetailsSubtitles;
     QLabel *m_backgroundLabel;
-    void updateMovieInfo();
     void updateImages(QList<int> images);
 };
 

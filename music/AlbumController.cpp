@@ -53,6 +53,7 @@ bool AlbumController::saveData(MediaCenterInterface *mediaCenterInterface)
         m_infoLoaded = saved;
     m_album->setHasChanged(false);
     m_album->clearImages();
+    m_album->bookletModel()->clear();
     if (saved)
         emit sigSaved(m_album);
     return saved;
@@ -88,6 +89,22 @@ void AlbumController::loadImage(int type, QUrl url)
     m_downloadManager->addDownload(d);
 }
 
+void AlbumController::loadImages(int type, QList<QUrl> urls)
+{
+    bool started = false;
+    foreach (const QUrl &url, urls) {
+        DownloadManagerElement d;
+        d.album = m_album;
+        d.imageType = type;
+        d.url = url;
+        if (!started) {
+            emit sigLoadingImages(m_album, QList<int>() << type);
+            started = true;
+        }
+        m_downloadManager->addDownload(d);
+    }
+}
+
 void AlbumController::onAllDownloadsFinished()
 {
     m_downloadsInProgress = false;
@@ -101,7 +118,11 @@ void AlbumController::onDownloadFinished(DownloadManagerElement elem)
     m_downloadsLeft--;
     emit sigDownloadProgress(m_album, m_downloadsLeft, m_downloadsSize);
 
-    if (!elem.data.isEmpty()) {
+    if (!elem.data.isEmpty() && elem.imageType == ImageType::AlbumBooklet) {
+        Image *image = new Image;
+        image->setRawData(elem.data);
+        m_album->bookletModel()->addImage(image);
+    } else if (!elem.data.isEmpty()) {
         ImageCache::instance()->invalidateImages(Manager::instance()->mediaCenterInterface()->imageFileName(m_album, elem.imageType));
         m_album->setRawImage(elem.imageType, elem.data);
     }
@@ -114,10 +135,10 @@ bool AlbumController::downloadsInProgress() const
     return m_downloadsInProgress;
 }
 
-void AlbumController::loadData(QString id, MusicScraperInterface *scraperInterface, QList<int> infos)
+void AlbumController::loadData(QString id, QString id2, MusicScraperInterface *scraperInterface, QList<int> infos)
 {
     m_infosToLoad = infos;
-    scraperInterface->loadData(id, m_album, infos);
+    scraperInterface->loadData(id, id2, m_album, infos);
 }
 
 void AlbumController::scraperLoadDone(MusicScraperInterface *scraper)
@@ -139,7 +160,7 @@ void AlbumController::scraperLoadDone(MusicScraperInterface *scraper)
         m_album->clear(QList<int>() << MusicScraperInfos::CdArt);
     }
 
-    if (!images.isEmpty() && !m_album->mbId().isEmpty()) {
+    if (!images.isEmpty() && !m_album->mbReleaseGroupId().isEmpty()) {
         ImageProviderInterface *imageProvider = 0;
         foreach (ImageProviderInterface *interface, Manager::instance()->imageProviders()) {
             if (interface->identifier() == "images.fanarttv-music_lib") {
@@ -152,7 +173,7 @@ void AlbumController::scraperLoadDone(MusicScraperInterface *scraper)
             return;
         }
         connect(imageProvider, SIGNAL(sigImagesLoaded(Album*,QMap<int,QList<Poster> >)), this, SLOT(onFanartLoadDone(Album*,QMap<int,QList<Poster> >)), Qt::UniqueConnection);
-        imageProvider->albumImages(m_album, m_album->mbId(), images);
+        imageProvider->albumImages(m_album, m_album->mbReleaseGroupId(), images);
     } else {
         onFanartLoadDone(m_album, QMap<int, QList<Poster> >());
     }

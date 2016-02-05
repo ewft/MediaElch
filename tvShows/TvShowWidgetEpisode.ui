@@ -289,19 +289,6 @@ border-bottom: 1px solid rgba(255, 255, 255, 80)</string>
               </property>
              </widget>
             </item>
-            <item row="5" column="1">
-             <widget class="QDoubleSpinBox" name="rating">
-              <property name="buttonSymbols">
-               <enum>QAbstractSpinBox::NoButtons</enum>
-              </property>
-              <property name="decimals">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <double>10.000000000000000</double>
-              </property>
-             </widget>
-            </item>
             <item row="6" column="0">
              <widget class="QLabel" name="label_8">
               <property name="text">
@@ -460,6 +447,89 @@ border-bottom: 1px solid rgba(255, 255, 255, 80)</string>
                <string>HH:mm:ss</string>
               </property>
              </widget>
+            </item>
+            <item row="5" column="1">
+             <layout class="QHBoxLayout" name="horizontalLayout_11">
+              <item>
+               <widget class="QDoubleSpinBox" name="rating">
+                <property name="buttonSymbols">
+                 <enum>QAbstractSpinBox::NoButtons</enum>
+                </property>
+                <property name="decimals">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <double>10.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_11">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Fixed</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>15</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_19">
+                <property name="text">
+                 <string>Votes</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="MySpinBox" name="votes">
+                <property name="buttonSymbols">
+                 <enum>QAbstractSpinBox::NoButtons</enum>
+                </property>
+                <property name="maximum">
+                 <number>9999999</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer_8">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeType">
+                 <enum>QSizePolicy::Fixed</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>15</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QLabel" name="label_20">
+                <property name="text">
+                 <string>Top 250</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="MySpinBox" name="top250">
+                <property name="buttonSymbols">
+                 <enum>QAbstractSpinBox::NoButtons</enum>
+                </property>
+                <property name="maximum">
+                 <number>9999999</number>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </item>
            </layout>
           </item>
@@ -1160,7 +1230,7 @@ border-bottom: 1px solid rgba(255, 255, 255, 80)</string>
            <string/>
           </property>
           <property name="pixmap">
-           <pixmap resource="../MediaElch.qrc">:/img/pictures_alt.png</pixmap>
+           <pixmap resource="../MediaElch.qrc">:/img/placeholders/thumb.png</pixmap>
           </property>
           <property name="alignment">
            <set>Qt::AlignCenter</set>
@@ -1198,6 +1268,11 @@ border-bottom: 1px solid rgba(255, 255, 255, 80)</string>
  </widget>
  <customwidgets>
   <customwidget>
+   <class>ClosableImage</class>
+   <extends>QLabel</extends>
+   <header>smallWidgets/ClosableImage.h</header>
+  </customwidget>
+  <customwidget>
    <class>MyLabel</class>
    <extends>QLabel</extends>
    <header>smallWidgets/MyLabel.h</header>
@@ -1209,9 +1284,9 @@ border-bottom: 1px solid rgba(255, 255, 255, 80)</string>
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>ClosableImage</class>
-   <extends>QLabel</extends>
-   <header>smallWidgets/ClosableImage.h</header>
+   <class>MySpinBox</class>
+   <extends>QSpinBox</extends>
+   <header>smallWidgets/MySpinBox.h</header>
   </customwidget>
  </customwidgets>
  <resources>
